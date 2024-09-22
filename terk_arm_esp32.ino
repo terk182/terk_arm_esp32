@@ -76,7 +76,9 @@ RobotArmIK robotArmIK(L1, L2, baseHeight, 125, 125, 420, 50);
   String savedPassword = "";
 
 bool isFirstTime = false; // เช็คว่าคือการเริ่มต้นครั้งแรกหรือไม่
-
+  char data[32];
+  int len = 0;
+  unsigned char k;
 // ตั้งค่า flag เพื่อตรวจสอบการทำงานของ Timer
 volatile bool timerFlag = false;
 
@@ -345,9 +347,9 @@ void writeStringToEEPROM(int addr, const String &data) {
 
 // ฟังก์ชันสำหรับอ่านข้อความจาก EEPROM
 String readStringFromEEPROM(int addr) {
-  char data[32];
-  int len = 0;
-  unsigned char k;
+  
+   len = 0;
+  
   k = EEPROM.read(addr);
   while (k != 0 && len < 32) {
     k = EEPROM.read(addr + len);
@@ -363,8 +365,8 @@ void setup() {
     EEPROM.begin(64);
 
   // ตรวจสอบว่าเคยบันทึก SSID และ Password หรือไม่
-   savedSSID = readStringFromEEPROM(0);
-   savedPassword = readStringFromEEPROM(32);
+  //  savedSSID = readStringFromEEPROM(0);
+  //  savedPassword = readStringFromEEPROM(32);
 
 
 
@@ -434,8 +436,8 @@ void setup() {
   server.on("/save-wifi", handleSaveWiFi);
   server.begin();
   Serial.println("Web server started");
-  setZero();
-  setHomePosition();
+  // setZero();
+  // setHomePosition();
 
       
     // ตั้งค่า Timer ให้เรียกใช้ `onTimer` ทุกๆ 1 ms
