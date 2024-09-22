@@ -5,25 +5,25 @@
 #include <math.h>  // สำหรับฟังก์ชันทางคณิตศาสตร์
 #include "RobotArmIK.h"
 #include <EEPROM.h>
-const char* ssid = "Terk_2.4GHz";  // ชื่อ Wi-Fi ของคุณ
+const char* ssid = "Terk_2.4GHz";      // ชื่อ Wi-Fi ของคุณ
 const char* password = "08110171188";  // รหัสผ่าน Wi-Fi ของคุณ
 
 // สร้างวัตถุ WebServer (ใช้พอร์ต 80)
 WebServer server(80);
-
+int len = 0;
 // สร้างวัตถุมอเตอร์และเซอร์โวเหมือนในโค้ดเดิม
 AccelStepper stepper1(1, 17, 16);  // ข้อต่อ 1 หมุนรอบแกน Z
 AccelStepper stepper2(1, 18, 5);   // ข้อต่อ 2
 AccelStepper stepper3(1, 21, 19);  // ข้อต่อ 3
 Servo gripperServo;
 // กำหนด Limit Switch
-#define limitSwitch1 26  // Limit switch สำหรับมอเตอร์ 1
-#define limitSwitch2 25  // Limit switch สำหรับมอเตอร์ 2
-#define limitSwitch3 33  // Limit switch สำหรับมอเตอร์ 3
+#define limitSwitch1 26    // Limit switch สำหรับมอเตอร์ 1
+#define limitSwitch2 25    // Limit switch สำหรับมอเตอร์ 2
+#define limitSwitch3 33    // Limit switch สำหรับมอเตอร์ 3
 #define DEBOUNCE_DELAY 10  // เวลาในการหน่วง debounce (50 มิลลิวินาที)
 
 // ประกาศ Timer
-hw_timer_t *timer = NULL;
+hw_timer_t* timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #define MAX_STEPS 1  // จำนวนขั้นตอนสูงสุดที่ต้องการสำหรับ trajectory
 
@@ -32,19 +32,19 @@ int theta1Steps[MAX_STEPS];
 int theta2Steps[MAX_STEPS];
 int theta3Steps[MAX_STEPS];
 
-int currentStep = 0;   // ขั้นตอนปัจจุบัน
-int totalSteps = 0;    // จำนวนขั้นตอนทั้งหมด
-bool isMoving = false; // สถานะของการเคลื่อนที่
+int currentStep = 0;    // ขั้นตอนปัจจุบัน
+int totalSteps = 0;     // จำนวนขั้นตอนทั้งหมด
+bool isMoving = false;  // สถานะของการเคลื่อนที่
 
 // ความยาวของข้อต่อ (สมมุติ)
-double L1 = 135;  // ความยาวของข้อต่อแรก L1 = 135 มม.
-double L2 = 157;  // ความยาวของข้อต่อที่สอง L2 = 147 มม.
-double baseHeight = 156; // ความสูงจากพื้น 156 มม.
+double L1 = 135;          // ความยาวของข้อต่อแรก L1 = 135 มม.
+double L2 = 157;          // ความยาวของข้อต่อที่สอง L2 = 147 มม.
+double baseHeight = 156;  // ความสูงจากพื้น 156 มม.
 
 int stepper1Position, stepper2Position, stepper3Position;
-const float theta1AngleToSteps = 77.222222;
-const float theta2AngleToSteps = 77.222222;
-const float phiAngleToSteps = 23.222222;
+float theta1AngleToSteps = 77.222222;
+float theta2AngleToSteps = 77.222222;
+float phiAngleToSteps = 23.222222;
 
 // ตัวแปรเก็บค่าที่ถูกส่งไปล่าสุด
 int lastTheta1 = 250;
@@ -72,19 +72,22 @@ g_Code cmd;
 RobotArmIK robotArmIK(L1, L2, baseHeight, 125, 125, 420, 50);
 
 
-  String savedSSID = "";
-  String savedPassword = "";
+String savedSSID = "";
+String savedPassword = "";
 
-bool isFirstTime = false; // เช็คว่าคือการเริ่มต้นครั้งแรกหรือไม่
-  char data[32];
-  int len = 0;
-  unsigned char k;
+bool isFirstTime = false;  // เช็คว่าคือการเริ่มต้นครั้งแรกหรือไม่
+char data[32];
 
-
-
-String css = "<style>body {font-family: Arial, sans-serif;padding: 20px;background-color: #f9f9f9;}.content {background-color: #fff;padding: 20px;border: 1px solid #ddd;box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);max-width: 800px;margin: 0 auto;}a {text-decoration: none;padding: 5px 10px;background-color: #007bff;color: white;border-radius: 3px;}a:hover {background-color: #0056b3;}</style>";
+unsigned char k;
 
 
+
+String css = "<style>body {font-family: Arial, sans-serif;display: flex;flex-direction: column;align-items: center;margin: 0; padding: 20px;}.container {max-width: 800px;width: 100%;}h1 {text-align: center;color: #333;}input[type='number'], input[type='range'] { width: 100%;padding: 5px; margin-bottom: 10px; }button {padding: 10px 20px;background-color: #007bff;color: #fff;border: none;cursor: pointer;}button:hover {background-color: #0056b3;}</style>";
+
+
+String ip = "";
+String gateway = "";
+String subnet = "";
 
 
 
@@ -94,120 +97,122 @@ volatile bool timerFlag = false;
 
 // ฟังก์ชัน Timer ISR
 void IRAM_ATTR onTimer() {
-    portENTER_CRITICAL_ISR(&timerMux);
-    timerFlag = true;
-    portEXIT_CRITICAL_ISR(&timerMux);
+  portENTER_CRITICAL_ISR(&timerMux);
+  timerFlag = true;
+  portEXIT_CRITICAL_ISR(&timerMux);
 }
 // ฟังก์ชัน debounce สำหรับ Limit Switch
 bool debounce(int pin) {
-    bool state = digitalRead(pin);
-    delay(DEBOUNCE_DELAY);  // รอช่วงเวลาหน่วง
-    bool newState = digitalRead(pin);
-    return state == newState ? state : HIGH;  // ตรวจสอบว่าค่าที่อ่านได้เป็นค่าเดิมหรือไม่
+  bool state = digitalRead(pin);
+  delay(DEBOUNCE_DELAY);  // รอช่วงเวลาหน่วง
+  bool newState = digitalRead(pin);
+  return state == newState ? state : HIGH;  // ตรวจสอบว่าค่าที่อ่านได้เป็นค่าเดิมหรือไม่
 }
 
 void setStepperSpeedAndAcceleration(int speed, int acceleration) {
-    stepper1.setMaxSpeed(speed);
-    stepper1.setAcceleration(acceleration);
-    stepper2.setMaxSpeed(speed);
-    stepper2.setAcceleration(acceleration);
-    stepper3.setMaxSpeed(speed);
-    stepper3.setAcceleration(acceleration);
+  stepper1.setMaxSpeed(speed);
+  stepper1.setAcceleration(acceleration);
+  stepper2.setMaxSpeed(speed);
+  stepper2.setAcceleration(acceleration);
+  stepper3.setMaxSpeed(speed);
+  stepper3.setAcceleration(acceleration);
 }
 // ฟังก์ชันสำหรับการตั้งค่าตำแหน่งเริ่มต้นโดยใช้ Limit Switch พร้อม debounce
 void setZero() {
 
-   // ตั้งค่าความเร็วและความเร่งที่ได้รับจากเว็บ
+  // ตั้งค่าความเร็วและความเร่งที่ได้รับจากเว็บ
   stepper1.setMaxSpeed(1000);
   stepper1.setAcceleration(500);
   stepper2.setMaxSpeed(1000);
   stepper2.setAcceleration(500);
   stepper3.setMaxSpeed(1000);
   stepper3.setAcceleration(500);
-    // กำหนดทิศทางการเคลื่อนที่ให้เคลื่อนไปยัง Limit Switch
-    stepper1.setSpeed(-2000); // เคลื่อนที่ไปทิศทางตรงข้ามเพื่อหาจุดเริ่มต้น
-    //stepper1.setAcceleration(500);
-    stepper2.setSpeed(-2000);
-    //stepper2.setAcceleration(500);
-    stepper3.setSpeed(-2000);
-   // stepper3.setAcceleration(500);
-    while (debounce(limitSwitch2) == HIGH) {
-        stepper2.runSpeed();
-    }
-    stepper2.setCurrentPosition(0); // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
-    // รันมอเตอร์จนกว่าจะถึง Limit Switch (พร้อม debounce)
-    while (debounce(limitSwitch1) == HIGH) {
-        stepper1.runSpeed();
-    }
-    stepper1.setCurrentPosition(0); // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
+  // กำหนดทิศทางการเคลื่อนที่ให้เคลื่อนไปยัง Limit Switch
+  stepper1.setSpeed(-2000);  // เคลื่อนที่ไปทิศทางตรงข้ามเพื่อหาจุดเริ่มต้น
+  //stepper1.setAcceleration(500);
+  stepper2.setSpeed(-2000);
+  //stepper2.setAcceleration(500);
+  stepper3.setSpeed(-2000);
+  // stepper3.setAcceleration(500);
+  while (debounce(limitSwitch2) == HIGH) {
+    stepper2.runSpeed();
+  }
+  stepper2.setCurrentPosition(0);  // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
+  // รันมอเตอร์จนกว่าจะถึง Limit Switch (พร้อม debounce)
+  while (debounce(limitSwitch1) == HIGH) {
+    stepper1.runSpeed();
+  }
+  stepper1.setCurrentPosition(0);  // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
 
 
 
-    while (debounce(limitSwitch3) == HIGH) {
-        stepper3.runSpeed();
-    }
-    stepper3.setCurrentPosition(0); // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
+  while (debounce(limitSwitch3) == HIGH) {
+    stepper3.runSpeed();
+  }
+  stepper3.setCurrentPosition(0);  // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
 
-    Serial.println("Set Zero: มอเตอร์ทั้งหมดถูกตั้งค่าที่ตำแหน่ง 0");
+  Serial.println("Set Zero: มอเตอร์ทั้งหมดถูกตั้งค่าที่ตำแหน่ง 0");
 }
 // ฟังก์ชันสำหรับตรวจสอบสถานะ Limit Switch
 // ฟังก์ชันสำหรับตรวจสอบสถานะ Limit Switch
 bool checkLimitSwitch() {
-  bool limit1 = digitalRead(limitSwitch1) == LOW; // LOW เมื่อถูกกด
+  bool limit1 = digitalRead(limitSwitch1) == LOW;  // LOW เมื่อถูกกด
   bool limit2 = digitalRead(limitSwitch2) == LOW;
   bool limit3 = digitalRead(limitSwitch3) == LOW;
-  
+
   // หากมี Limit Switch ใดถูกกด, ให้หยุดการเคลื่อนที่
   if (limit1 || limit2 || limit3) {
     Serial.println("Limit switch triggered! Motion stopped.");
-    return true; // มี Limit Switch ถูกกด
+    return true;  // มี Limit Switch ถูกกด
   }
-  return false; // ไม่มี Limit Switch ถูกกด
+  return false;  // ไม่มี Limit Switch ถูกกด
 }
 
 float lerp(float start, float end, float t) {
-    return start + (end - start) * t;
+  return start + (end - start) * t;
 }
 // ฟังก์ชัน Trajectory Planning
 void trajectoryPlanning(int targetTheta1, int targetTheta2, int targetTheta3, int duration) {
-    totalSteps = MAX_STEPS;
-    float timePerStep = (float)duration / totalSteps;
+  totalSteps = MAX_STEPS;
+  float timePerStep = (float)duration / totalSteps;
 
-    // คำนวณตำแหน่งมุมในแต่ละขั้นตอน
-    for (int i = 0; i < totalSteps; ++i) {
-        float t = (float)i / totalSteps;
+  // คำนวณตำแหน่งมุมในแต่ละขั้นตอน
+  for (int i = 0; i < totalSteps; ++i) {
+    float t = (float)i / totalSteps;
 
-        // คำนวณมุมปัจจุบันโดยใช้ Linear Interpolation
-        int currentTheta1 = lerp(lastTheta1, targetTheta1, t);
-        int currentTheta2 = lerp(lastTheta2, targetTheta2, t);
-        int currentTheta3 = lerp(lastTheta3, targetTheta3, t);
+    // คำนวณมุมปัจจุบันโดยใช้ Linear Interpolation
+    int currentTheta1 = lerp(lastTheta1, targetTheta1, t);
+    int currentTheta2 = lerp(lastTheta2, targetTheta2, t);
+    int currentTheta3 = lerp(lastTheta3, targetTheta3, t);
 
-        // เรียกใช้ฟังก์ชัน runIK เพื่อคำนวณตำแหน่ง x, y, z ที่ต้องการ
-        g_Code stepCmd = robotArmIK.runIK(currentTheta1, currentTheta2, currentTheta3, cmd);
+    // เรียกใช้ฟังก์ชัน runIK เพื่อคำนวณตำแหน่ง x, y, z ที่ต้องการ
+    g_Code stepCmd = robotArmIK.runIK(currentTheta1, currentTheta2, currentTheta3, cmd);
 
-        // จัดเก็บค่าที่คำนวณได้
-        theta1Steps[i] = stepCmd.y * theta1AngleToSteps;
-        theta2Steps[i] = stepCmd.z * theta2AngleToSteps;
-        theta3Steps[i] = stepCmd.x * phiAngleToSteps;
-    }
+    // จัดเก็บค่าที่คำนวณได้
+    theta1Steps[i] = stepCmd.y * theta1AngleToSteps;
+    theta2Steps[i] = stepCmd.z * theta2AngleToSteps;
+    theta3Steps[i] = stepCmd.x * phiAngleToSteps;
+  }
 
-    // ตั้งค่าเริ่มต้นสำหรับการเคลื่อนที่
-    currentStep = 0;
-    isMoving = true;
-    lastTheta1 = targetTheta1;
-    lastTheta2 = targetTheta2;
-    lastTheta3 = targetTheta3;
+  // ตั้งค่าเริ่มต้นสำหรับการเคลื่อนที่
+  currentStep = 0;
+  isMoving = true;
+  lastTheta1 = targetTheta1;
+  lastTheta2 = targetTheta2;
+  lastTheta3 = targetTheta3;
 }
 void handleSetup() {
   if (isFirstTime) {
     // แสดงหน้าเว็บสำหรับการตั้งค่า Wi-Fi
-    String html = "<html>";
-    html = html + css;
-    html += "<body>";
-    html += "<h1>WiFi Setup</h1>";
-    html += "<form action=\"/save-wifi\" method=\"POST\">";
+    String html = "<html><body>";
+    html += css;
+    html += "<h1>WiFi and Network Setup</h1>";
+    html += "<form action=\"/save-setup\" method=\"POST\">";
     html += "SSID: <input type=\"text\" name=\"ssid\"><br>";
     html += "Password: <input type=\"password\" name=\"password\"><br>";
+    html += "Static IP Address: <input type=\"text\" name=\"ip\" value=\"" + readStringFromEEPROM(64) + "\"><br>";
+    html += "Gateway: <input type=\"text\" name=\"gateway\" value=\"" + readStringFromEEPROM(96) + "\"><br>";
+    html += "Subnet Mask: <input type=\"text\" name=\"subnet\" value=\"" + readStringFromEEPROM(128) + "\"><br>";
     html += "<input type=\"submit\" value=\"Save\">";
     html += "</form>";
     html += "</body></html>";
@@ -217,22 +222,46 @@ void handleSetup() {
     handleSetup();
   }
 }
+void loadSettingsFromEEPROM() {
+  theta1AngleToSteps = EEPROM.readFloat(0);
+  theta2AngleToSteps = EEPROM.readFloat(4);
+  phiAngleToSteps = EEPROM.readFloat(8);
+  L1 = EEPROM.readFloat(12);
+  L2 = EEPROM.readFloat(16);
+  baseHeight = EEPROM.readFloat(20);
 
+  // ตรวจสอบว่ามีการตั้งค่าไว้แล้วหรือไม่ ถ้าไม่ให้ใช้ค่าที่ตั้งไว้ในโค้ด
+  if (theta1AngleToSteps == 0) theta1AngleToSteps = 77.222222;
+  if (theta2AngleToSteps == 0) theta2AngleToSteps = 77.222222;
+  if (phiAngleToSteps == 0) phiAngleToSteps = 23.222222;
+  if (L1 == 0) L1 = 135;
+  if (L2 == 0) L2 = 157;
+  if (baseHeight == 0) baseHeight = 156;
+}
 void handleSaveWiFi() {
-  String ssid = server.arg("ssid");
-  String password = server.arg("password");
+  savedSSID = server.arg("ssid");
+  savedPassword = server.arg("password");
+  ip = server.arg("ip");
+  gateway = server.arg("gateway");
+  subnet = server.arg("subnet");
 
-  if (ssid.length() > 0 && password.length() > 0) {
-    // บันทึก SSID และ Password ลง EEPROM
-    writeStringToEEPROM(0, ssid);
-    writeStringToEEPROM(32, password);
+  if (savedSSID.length() > 0 && savedPassword.length() > 0) {
+    // บันทึก SSID และ Password
+    writeStringToEEPROM(0, savedSSID);
+    writeStringToEEPROM(32, savedPassword);
     EEPROM.commit();
 
-    server.send(200, "text/html", "WiFi settings saved. Restarting...");
+    // บันทึก IP Address, Gateway และ Subnet
+    writeStringToEEPROM(64, ip);
+    writeStringToEEPROM(96, gateway);
+    writeStringToEEPROM(128, subnet);
+    EEPROM.commit();
+
+    server.send(200, "text/html", "Settings saved. Restarting...");
     delay(2000);
-    ESP.restart(); // รีสตาร์ท ESP32 เพื่อเชื่อมต่อ Wi-Fi ใหม่
+    ESP.restart();
   } else {
-    server.send(200, "text/html", "Please provide both SSID and Password.");
+    server.send(200, "text/html", "Please provide all required fields.");
   }
 }
 // ฟังก์ชันสำหรับแสดงหน้าเว็บพร้อมค่าสุดท้ายที่ผู้ใช้ส่ง
@@ -288,21 +317,69 @@ void handleRoot() {
   html += "</script>";
 
   html += "</body></html>";
-  
+
   server.send(200, "text/html", html);
 }
-void setHomePosition(){
-    // คำนวณตำแหน่งปลายแขนกลด้วย Forward Kinematics
+
+// ฟังก์ชันการแสดงหน้าเว็บสำหรับตั้งค่า
+void handleSetupPage() {
+  String html = "<html><body>";
+  html += "<h1>Robot Arm Configuration</h1>";
+  html += "<form action=\"/save-param\" method=\"POST\">";
+  html += "Theta1 AngleToSteps: <input type=\"number\" step=\"0.1\" name=\"theta1AngleToSteps\" value=\"" + String(theta1AngleToSteps) + "\"><br>";
+  html += "Theta2 AngleToSteps: <input type=\"number\" step=\"0.1\" name=\"theta2AngleToSteps\" value=\"" + String(theta2AngleToSteps) + "\"><br>";
+  html += "Phi AngleToSteps: <input type=\"number\" step=\"0.1\" name=\"phiAngleToSteps\" value=\"" + String(phiAngleToSteps) + "\"><br>";
+  html += "L1 (mm): <input type=\"number\" step=\"0.1\" name=\"L1\" value=\"" + String(L1) + "\"><br>";
+  html += "L2 (mm): <input type=\"number\" step=\"0.1\" name=\"L2\" value=\"" + String(L2) + "\"><br>";
+  html += "Base Height (mm): <input type=\"number\" step=\"0.1\" name=\"baseHeight\" value=\"" + String(baseHeight) + "\"><br>";
+  html += "Static IP Address: <input type=\"text\" name=\"ip\" value=\"" + readStringFromEEPROM(64) + "\"><br>";
+  html += "Gateway: <input type=\"text\" name=\"gateway\" value=\"" + readStringFromEEPROM(96) + "\"><br>";
+  html += "Subnet Mask: <input type=\"text\" name=\"subnet\" value=\"" + readStringFromEEPROM(128) + "\"><br>";
+  html += "<input type=\"submit\" value=\"Save\">";
+  html += "</form>";
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
+}
+
+void handleSaveSetupArm() {
+  // อ่านค่าจากฟอร์ม
+  theta1AngleToSteps = server.arg("theta1AngleToSteps").toFloat();
+  theta2AngleToSteps = server.arg("theta2AngleToSteps").toFloat();
+  phiAngleToSteps = server.arg("phiAngleToSteps").toFloat();
+  L1 = server.arg("L1").toFloat();
+  L2 = server.arg("L2").toFloat();
+  baseHeight = server.arg("baseHeight").toFloat();
+  String ip = server.arg("ip");
+  String gateway = server.arg("gateway");
+  String subnet = server.arg("subnet");
+
+  // บันทึกค่าลงใน EEPROM
+  EEPROM.writeFloat(0, theta1AngleToSteps);
+  EEPROM.writeFloat(4, theta2AngleToSteps);
+  EEPROM.writeFloat(8, phiAngleToSteps);
+  EEPROM.writeFloat(12, L1);
+  EEPROM.writeFloat(16, L2);
+  EEPROM.writeFloat(20, baseHeight);
+  writeStringToEEPROM(64, ip);
+  writeStringToEEPROM(96, gateway);
+  writeStringToEEPROM(128, subnet);
+  EEPROM.commit();
+
+  server.send(200, "text/html", "<html><body><h1>Settings Saved</h1><a href=\"/setup\">Go Back</a></body></html>");
+}
+void setHomePosition() {
+  // คำนวณตำแหน่งปลายแขนกลด้วย Forward Kinematics
   // calculateForwardKinematics(lastTheta1, lastTheta2, lastTheta3);
 
   // ตั้งค่าความเร็วและความเร่งที่ได้รับจากเว็บ
 
-setStepperSpeedAndAcceleration(3000, 500);
+  setStepperSpeedAndAcceleration(3000, 500);
   // แปลงมุมเป็นสเต็ปและเคลื่อนมอเตอร์
-  stepper1.moveTo(lastTheta1_home * theta1AngleToSteps); // theta1AngleToSteps
-  stepper2.moveTo(lastTheta2_home * theta2AngleToSteps); // theta2AngleToSteps
-  stepper3.moveTo(lastTheta3_home * phiAngleToSteps);  // phiAngleToSteps
-  
+  stepper1.moveTo(lastTheta1_home * theta1AngleToSteps);  // theta1AngleToSteps
+  stepper2.moveTo(lastTheta2_home * theta2AngleToSteps);  // theta2AngleToSteps
+  stepper3.moveTo(lastTheta3_home * phiAngleToSteps);     // phiAngleToSteps
+
   // เคลื่อนที่ทั้งหมด
   while (stepper1.isRunning() || stepper2.isRunning() || stepper3.isRunning()) {
 
@@ -310,82 +387,94 @@ setStepperSpeedAndAcceleration(3000, 500);
     stepper2.run();
     stepper3.run();
   }
-stepper1.setCurrentPosition(0); // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
-stepper2.setCurrentPosition(0); // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
-stepper3.setCurrentPosition(0); // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
+  stepper1.setCurrentPosition(0);  // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
+  stepper2.setCurrentPosition(0);  // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
+  stepper3.setCurrentPosition(0);  // ตั้งค่าเป็นศูนย์เมื่อถึง Limit Switch
   // ควบคุม Gripper
   gripperServo.write(lastGripper);
 }
 // ฟังก์ชันสำหรับรับคำสั่งการเคลื่อนที่จากเว็บเบราว์เซอร์
 void handleMove() {
- // รับค่าจากฟอร์ม
-  targetTheta1_i  = server.arg("theta1").toInt();
-  targetTheta2_i  = server.arg("theta2").toInt();
-  targetTheta3_i  = server.arg("theta3").toInt();
+  // รับค่าจากฟอร์ม
+  targetTheta1_i = server.arg("theta1").toInt();
+  targetTheta2_i = server.arg("theta2").toInt();
+  targetTheta3_i = server.arg("theta3").toInt();
   lastGripper = server.arg("gripper").toInt();
   lastSpeed = server.arg("speed").toInt();
   lastAcceleration = server.arg("acceleration").toInt();
-
+  Serial.println("------handleMove-------");
+  Serial.println(targetTheta1_i);
+  Serial.println(targetTheta2_i);
+  Serial.println(targetTheta3_i);
+  Serial.println(lastGripper);
+  Serial.println(lastSpeed);
+  Serial.println(lastAcceleration);
+  Serial.println("-------------");
   // คำนวณตำแหน่งปลายแขนกลด้วย Forward Kinematics
   // calculateForwardKinematics(lastTheta1, lastTheta2, lastTheta3);
 
   // ตั้งค่าความเร็วและความเร่งที่ได้รับจากเว็บ
-setStepperSpeedAndAcceleration(lastSpeed, lastAcceleration);
+  setStepperSpeedAndAcceleration(lastSpeed, lastAcceleration);
 
 
 
-trajectoryPlanning(targetTheta1_i, targetTheta2_i, targetTheta3_i, 7);
+  trajectoryPlanning(targetTheta1_i, targetTheta2_i, targetTheta3_i, 7);
 
   // ควบคุม Gripper
   gripperServo.write(lastGripper);
 
   // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
   server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
-  server.send(303);  // 303: See Other (Redirect to GET)
+  server.send(303);                    // 303: See Other (Redirect to GET)
 }
 void powerOffMotors() {
-    stepper1.disableOutputs();
-    stepper2.disableOutputs();
-    stepper3.disableOutputs();
+  stepper1.disableOutputs();
+  stepper2.disableOutputs();
+  stepper3.disableOutputs();
 }
 // ฟังก์ชันสำหรับบันทึกข้อความลงใน EEPROM
-void writeStringToEEPROM(int addr, const String &data) {
-  int len = data.length();
+void writeStringToEEPROM(int addr, const String& data) {
+  len = data.length();
   for (int i = 0; i < len; i++) {
     EEPROM.write(addr + i, data[i]);
   }
-  EEPROM.write(addr + len, 0); // Null terminator
+  EEPROM.write(addr + len, 0);  // Null terminator
+  EEPROM.commit();              // บันทึกข้อมูลลง EEPROM จริงๆ
 }
 
 // ฟังก์ชันสำหรับอ่านข้อความจาก EEPROM
 String readStringFromEEPROM(int addr) {
-  
-   len = 0;
-  
+  memset(data, 0, sizeof(data));
+
+  len = 0;
+
   k = EEPROM.read(addr);
+  Serial.println("-------------");
   while (k != 0 && len < 32) {
-    k = EEPROM.read(addr + len);
-    data[len] = k;
+    data[len] = k;  // เก็บค่าที่อ่านได้ในตัวแปร data
     len++;
+    k = EEPROM.read(addr + len);  // อ่านตัวอักษรถัดไปจาก EEPROM
+    Serial.println(k);            // แสดงค่าที่อ่านจาก EEPROM เพื่อวิเคราะห์
   }
-  data[len] = '\0';
-  return String(data);
+  Serial.println("-------------");
+  data[len] = '\0';  // สิ้นสุด string ด้วย null terminator
+
+  return String(data);  // แปลง char array เป็น String และส่งคืน
 }
 void setup() {
   Serial.begin(115200);
 
-    EEPROM.begin(64);
+  EEPROM.begin(192);
 
   // ตรวจสอบว่าเคยบันทึก SSID และ Password หรือไม่
-  //  savedSSID = readStringFromEEPROM(0);
-  //  savedPassword = readStringFromEEPROM(32);
 
 
 
-    // ตั้งค่า Limit Switch เป็น INPUT_PULLUP
-    pinMode(limitSwitch1, INPUT_PULLUP);
-    pinMode(limitSwitch2, INPUT_PULLUP);
-    pinMode(limitSwitch3, INPUT_PULLUP);
+
+  // ตั้งค่า Limit Switch เป็น INPUT_PULLUP
+  pinMode(limitSwitch1, INPUT_PULLUP);
+  pinMode(limitSwitch2, INPUT_PULLUP);
+  pinMode(limitSwitch3, INPUT_PULLUP);
   // เชื่อมต่อ Wi-Fi
   // เชื่อมต่อ Wi-Fi
   // WiFi.begin(ssid, password);
@@ -398,21 +487,36 @@ void setup() {
   // Serial.println("Connected to WiFi");
   // Serial.print("IP Address: ");
   // Serial.println(WiFi.localIP());  // แสดง IP Address ของ ESP32
-
-
-
-  if (savedSSID.length() == 0 || savedPassword.length() == 0) {
-    // ไม่มีการตั้งค่า Wi-Fi บันทึกไว้ ใช้งานโหมด AP
+  // writeStringToEEPROM(0, "0");
+  // writeStringToEEPROM(32 ,"0");
+  savedSSID = readStringFromEEPROM(0);
+  savedPassword = readStringFromEEPROM(32);
+  ip = readStringFromEEPROM(64);
+  gateway = readStringFromEEPROM(96);
+  subnet = readStringFromEEPROM(128);
+  Serial.println(savedSSID);
+  Serial.println(savedPassword);
+  if (savedSSID.length() == 1 || savedPassword.length() == 1) {
     Serial.println("Starting in AP mode...");
     isFirstTime = true;
-    WiFi.softAP("RobotArmAP", "12345678"); // ชื่อและรหัสผ่าน Wi-Fi ของ AP
+    WiFi.softAP("RobotArmAP", "12345678");
 
     IPAddress IP = WiFi.softAPIP();
     Serial.print("AP IP address: ");
     Serial.println(IP);
   } else {
-    // มีการตั้งค่า Wi-Fi บันทึกไว้แล้ว เชื่อมต่อกับ Wi-Fi นั้น
-    Serial.println("Connecting to WiFi...");
+    // ตรวจสอบและตั้งค่า IP แบบคงที่จากข้อมูลที่บันทึก
+    if (ip.length() > 0 && gateway.length() > 0 && subnet.length() > 0) {
+      IPAddress local_IP, local_gateway, local_subnet;
+      local_IP.fromString(ip);
+      local_gateway.fromString(gateway);
+      local_subnet.fromString(subnet);
+
+      if (!WiFi.config(local_IP, local_gateway, local_subnet)) {
+        Serial.println("STA Failed to configure");
+      }
+    }
+
     WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
 
     while (WiFi.status() != WL_CONNECTED) {
@@ -434,60 +538,60 @@ void setup() {
 
 
 
-
-
   // เริ่มต้นการตั้งค่าเซอร์โวและมอเตอร์
   gripperServo.attach(13);
   gripperServo.write(180);
   setStepperSpeedAndAcceleration(lastSpeed, lastAcceleration);
 
   // เริ่มต้น Web Server
-  server.on("/", handleRoot);       // หน้าเว็บหลัก
-  server.on("/move", handleMove);   // รับคำสั่งการเคลื่อนที่
-  server.on("/setup", handleSetup);       // หน้าเว็บหลัก
-  server.on("/save-wifi", handleSaveWiFi);
+  server.on("/", handleRoot);               // หน้าเว็บหลัก
+  server.on("/move", handleMove);           // รับคำสั่งการเคลื่อนที่
+  server.on("/setupwifi", handleSetup);     // หน้าเว็บหลัก
+  server.on("/setuparm", handleSetupPage);  // หน้าเว็บหลัก
+  server.on("/save-setup", handleSaveWiFi);
+  server.on("/save-param", handleSaveSetupArm);
   server.begin();
   Serial.println("Web server started");
   // setZero();
   // setHomePosition();
 
-      
-    // ตั้งค่า Timer ให้เรียกใช้ `onTimer` ทุกๆ 1 ms
-    timer = timerBegin(0, 80, true);  // Timer 0, Prescaler 80, count up
-    timerAttachInterrupt(timer, &onTimer, true);
-    timerAlarmWrite(timer, 1000, true);  // เรียกทุกๆ 1000 ticks = 1 ms
-    timerAlarmEnable(timer);  // เปิดใช้งาน Timer
+
+  // ตั้งค่า Timer ให้เรียกใช้ `onTimer` ทุกๆ 1 ms
+  timer = timerBegin(0, 80, true);  // Timer 0, Prescaler 80, count up
+  timerAttachInterrupt(timer, &onTimer, true);
+  timerAlarmWrite(timer, 1000, true);  // เรียกทุกๆ 1000 ticks = 1 ms
+  timerAlarmEnable(timer);             // เปิดใช้งาน Timer
 }
 
 void loop() {
 
-      if (timerFlag) {
-        // Reset flag
-   portENTER_CRITICAL(&timerMux);
-        timerFlag = false;
-        portEXIT_CRITICAL(&timerMux);
+  if (timerFlag) {
+    // Reset flag
+    portENTER_CRITICAL(&timerMux);
+    timerFlag = false;
+    portEXIT_CRITICAL(&timerMux);
 
-        if (isMoving) {
-            // ตั้งค่ามอเตอร์ให้เคลื่อนที่ไปยังตำแหน่งที่เก็บไว้
-            stepper1.moveTo(theta1Steps[currentStep]);
-            stepper2.moveTo(theta2Steps[currentStep]);
-            stepper3.moveTo(theta3Steps[currentStep]);
+    if (isMoving) {
+      // ตั้งค่ามอเตอร์ให้เคลื่อนที่ไปยังตำแหน่งที่เก็บไว้
+      stepper1.moveTo(theta1Steps[currentStep]);
+      stepper2.moveTo(theta2Steps[currentStep]);
+      stepper3.moveTo(theta3Steps[currentStep]);
 
-            // รันมอเตอร์
-            stepper1.run();
-            stepper2.run();
-            stepper3.run();
+      // รันมอเตอร์
+      stepper1.run();
+      stepper2.run();
+      stepper3.run();
 
-            // ตรวจสอบว่าไปยังตำแหน่งที่กำหนดแล้วหรือยัง
-            if (stepper1.distanceToGo() == 0 && stepper2.distanceToGo() == 0 && stepper3.distanceToGo() == 0) {
-                currentStep++;  // ไปยังขั้นตอนถัดไป
-                if (currentStep >= totalSteps) {
-                    isMoving = false;  // หยุดการเคลื่อนที่เมื่อถึงขั้นตอนสุดท้าย
-                    Serial.println("Movement completed");
-                }
-            }
+      // ตรวจสอบว่าไปยังตำแหน่งที่กำหนดแล้วหรือยัง
+      if (stepper1.distanceToGo() == 0 && stepper2.distanceToGo() == 0 && stepper3.distanceToGo() == 0) {
+        currentStep++;  // ไปยังขั้นตอนถัดไป
+        if (currentStep >= totalSteps) {
+          isMoving = false;  // หยุดการเคลื่อนที่เมื่อถึงขั้นตอนสุดท้าย
+          Serial.println("Movement completed");
         }
+      }
     }
+  }
   // จัดการคำร้องขอ HTTP
   server.handleClient();
 }
