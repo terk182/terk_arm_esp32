@@ -79,6 +79,16 @@ bool isFirstTime = false; // เช็คว่าคือการเริ่
   char data[32];
   int len = 0;
   unsigned char k;
+
+
+
+String css = "<style>body {font-family: Arial, sans-serif;padding: 20px;background-color: #f9f9f9;}.content {background-color: #fff;padding: 20px;border: 1px solid #ddd;box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);max-width: 800px;margin: 0 auto;}a {text-decoration: none;padding: 5px 10px;background-color: #007bff;color: white;border-radius: 3px;}a:hover {background-color: #0056b3;}</style>";
+
+
+
+
+
+
 // ตั้งค่า flag เพื่อตรวจสอบการทำงานของ Timer
 volatile bool timerFlag = false;
 
@@ -191,7 +201,9 @@ void trajectoryPlanning(int targetTheta1, int targetTheta2, int targetTheta3, in
 void handleSetup() {
   if (isFirstTime) {
     // แสดงหน้าเว็บสำหรับการตั้งค่า Wi-Fi
-    String html = "<html><body>";
+    String html = "<html>";
+    html = html + css;
+    html += "<body>";
     html += "<h1>WiFi Setup</h1>";
     html += "<form action=\"/save-wifi\" method=\"POST\">";
     html += "SSID: <input type=\"text\" name=\"ssid\"><br>";
