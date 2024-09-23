@@ -1,3 +1,4 @@
+#include <queue>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <AccelStepper.h>
@@ -8,6 +9,14 @@
 const char* ssid = "Terk_2.4GHz";      // ชื่อ Wi-Fi ของคุณ
 const char* password = "08110171188";  // รหัสผ่าน Wi-Fi ของคุณ
 
+struct Command {
+  String type;
+  int theta1;
+  int theta2;
+  int theta3;
+  int speed;
+  int acceleration;
+};
 // สร้างวัตถุ WebServer (ใช้พอร์ต 80)
 WebServer server(80);
 int len = 0;
@@ -90,7 +99,7 @@ String gateway = "";
 String subnet = "";
 
 
-
+int delay_time;
 
 // ตั้งค่า flag เพื่อตรวจสอบการทำงานของ Timer
 volatile bool timerFlag = false;
@@ -427,6 +436,36 @@ void handleMove() {
   server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
   server.send(303);                    // 303: See Other (Redirect to GET)
 }
+
+void handleGripper() {
+  // รับค่าจากฟอร์ม
+  lastGripper = server.arg("gripper").toInt();
+  
+  Serial.println(lastGripper);
+ 
+  Serial.println("-------------");
+  
+  // ควบคุม Gripper
+  gripperServo.write(lastGripper);
+
+  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
+  server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
+  server.send(303);                    // 303: See Other (Redirect to GET)
+}
+void handleDelay() {
+  // รับค่าจากฟอร์ม
+  delay_time = server.arg("time").toInt();
+  
+  Serial.println(lastGripper);
+ 
+  Serial.println("------delay_time-------");
+  
+  // ควบคุม Gripper
+ 
+  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
+  server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
+  server.send(303);                    // 303: See Other (Redirect to GET)
+}
 void powerOffMotors() {
   stepper1.disableOutputs();
   stepper2.disableOutputs();
@@ -544,12 +583,15 @@ void setup() {
   setStepperSpeedAndAcceleration(lastSpeed, lastAcceleration);
 
   // เริ่มต้น Web Server
-  server.on("/", handleRoot);               // หน้าเว็บหลัก
-  server.on("/move", handleMove);           // รับคำสั่งการเคลื่อนที่
+  server.on("/", handleRoot);      // หน้าเว็บหลัก
+  server.on("/move", handleMove);  // รับคำสั่งการเคลื่อนที่
+
   server.on("/setupwifi", handleSetup);     // หน้าเว็บหลัก
   server.on("/setuparm", handleSetupPage);  // หน้าเว็บหลัก
   server.on("/save-setup", handleSaveWiFi);
   server.on("/save-param", handleSaveSetupArm);
+  server.on("/controlGripper", handleGripper);
+  server.on("/delay", handleDelay);
   server.begin();
   Serial.println("Web server started");
   // setZero();
