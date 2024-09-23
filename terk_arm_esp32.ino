@@ -83,7 +83,7 @@ double endEffectorZ = 0;  // เพิ่มแกน Z
 g_Code cmd;
 RobotArmIK robotArmIK(L1, L2, baseHeight, 125, 125, 420, 50);
 
-
+String Arm_mode = "JOINT";
 String savedSSID = "";
 String savedPassword = "";
 
@@ -414,6 +414,7 @@ void handleMove() {
   lastGripper = server.arg("gripper").toInt();
   lastSpeed = server.arg("speed").toInt();
   lastAcceleration = server.arg("acceleration").toInt();
+  Arm_mode = String(server.arg("mode"));
   Serial.println("------handleMove-------");
   Serial.println(targetTheta1_i);
   Serial.println(targetTheta2_i);
@@ -421,6 +422,7 @@ void handleMove() {
   Serial.println(lastGripper);
   Serial.println(lastSpeed);
   Serial.println(lastAcceleration);
+  Serial.println(Arm_mode);
   Serial.println("-------------");
   // คำนวณตำแหน่งปลายแขนกลด้วย Forward Kinematics
   // calculateForwardKinematics(lastTheta1, lastTheta2, lastTheta3);
