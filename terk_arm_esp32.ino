@@ -17,6 +17,9 @@ struct Command {
   int speed;
   int acceleration;
 };
+
+// สร้างคิวสำหรับจัดเก็บคำสั่ง
+std::queue<Command> commandQueue;
 // สร้างวัตถุ WebServer (ใช้พอร์ต 80)
 WebServer server(80);
 int len = 0;
@@ -440,11 +443,11 @@ void handleMove() {
 void handleGripper() {
   // รับค่าจากฟอร์ม
   lastGripper = server.arg("gripper").toInt();
-  
+
   Serial.println(lastGripper);
- 
+
   Serial.println("-------------");
-  
+
   // ควบคุม Gripper
   gripperServo.write(lastGripper);
 
@@ -455,13 +458,37 @@ void handleGripper() {
 void handleDelay() {
   // รับค่าจากฟอร์ม
   delay_time = server.arg("time").toInt();
-  
+
   Serial.println(lastGripper);
- 
+
   Serial.println("------delay_time-------");
-  
+
   // ควบคุม Gripper
- 
+
+  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
+  server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
+  server.send(303);                    // 303: See Other (Redirect to GET)
+}
+void handleHome() {
+  // รับค่าจากฟอร์ม
+  setHomePosition();
+
+  Serial.println("------Home-------");
+
+  // ควบคุม Gripper
+
+  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
+  server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
+  server.send(303);                    // 303: See Other (Redirect to GET)
+}
+void handleZero() {
+  // รับค่าจากฟอร์ม
+  setZero();
+
+  Serial.println("------Home-------");
+
+  // ควบคุม Gripper
+
   // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
   server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
   server.send(303);                    // 303: See Other (Redirect to GET)
@@ -570,13 +597,6 @@ void setup() {
   }
 
 
-
-
-
-
-
-
-
   // เริ่มต้นการตั้งค่าเซอร์โวและมอเตอร์
   gripperServo.attach(13);
   gripperServo.write(180);
@@ -592,6 +612,8 @@ void setup() {
   server.on("/save-param", handleSaveSetupArm);
   server.on("/controlGripper", handleGripper);
   server.on("/delay", handleDelay);
+  server.on("/home", handleHome);
+  server.on("/zero", handleZero);
   server.begin();
   Serial.println("Web server started");
   // setZero();
