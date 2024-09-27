@@ -555,8 +555,8 @@ void setup() {
   // Serial.println("Connected to WiFi");
   // Serial.print("IP Address: ");
   // Serial.println(WiFi.localIP());  // แสดง IP Address ของ ESP32
-  // writeStringToEEPROM(0, "0");
-  // writeStringToEEPROM(32 ,"0");
+  writeStringToEEPROM(0, "0");
+  writeStringToEEPROM(32 ,"0");
   savedSSID = readStringFromEEPROM(0);
   savedPassword = readStringFromEEPROM(32);
   ip = readStringFromEEPROM(64);
