@@ -26,6 +26,7 @@ std::queue<Command> commandQueue;
 // สร้างวัตถุ WebServer (ใช้พอร์ต 80)
 WebServer server(80);
 int len = 0;
+int wifi_connecy_count = 0;
 // สร้างวัตถุมอเตอร์และเซอร์โวเหมือนในโค้ดเดิม
 AccelStepper stepper1(1, 17, 16);  // ข้อต่อ 1 หมุนรอบแกน Z
 AccelStepper stepper2(1, 18, 5);   // ข้อต่อ 2
@@ -88,17 +89,19 @@ String Arm_mode = "JOINT";
 String savedSSID = "";
 String savedPassword = "";
 String html = "";
+String content = "";
+String state = "";
 bool isFirstTime = false;  // เช็คว่าคือการเริ่มต้นครั้งแรกหรือไม่
 char data[32];
 
 unsigned char k;
 
-String css = "<style>body {font-family: Arial, sans-serif;display: flex;flex-direction: column;align-items: center;margin: 0; padding: 20px;}.container {max-width: 800px;width: 100%;}h1 {text-align: center;color: #333;}input[type='number'], input[type='range'] { width: 100%;padding: 5px; margin-bottom: 10px; }button {padding: 10px 20px;background-color: #007bff;color: #fff;border: none;cursor: pointer;}button:hover {background-color: #0056b3;}</style>";
+
 
 String ip = "";
 String gateway = "";
 String subnet = "";
-
+String urlMain = "http://183.88.230.236:12000";
 int delay_time;
 
 // ตั้งค่า flag เพื่อตรวจสอบการทำงานของ Timer
@@ -217,25 +220,20 @@ void trajectoryPlanning(int targetTheta1, int targetTheta2, int targetTheta3, in
   lastTheta3 = targetTheta3;
 }
 void handleSetup() {
-  if (isFirstTime) {
-    // แสดงหน้าเว็บสำหรับการตั้งค่า Wi-Fi
-    html = "<html><body>";
-    html += css;
-    html += "<h1>WiFi and Network Setup</h1>";
-    html += "<form action=\"/save-setup\" method=\"POST\">";
-    html += "SSID: <input type=\"text\" name=\"ssid\"><br>";
-    html += "Password: <input type=\"password\" name=\"password\"><br>";
-    html += "Static IP Address: <input type=\"text\" name=\"ip\" value=\"" + readStringFromEEPROM(64) + "\"><br>";
-    html += "Gateway: <input type=\"text\" name=\"gateway\" value=\"" + readStringFromEEPROM(96) + "\"><br>";
-    html += "Subnet Mask: <input type=\"text\" name=\"subnet\" value=\"" + readStringFromEEPROM(128) + "\"><br>";
-    html += "<input type=\"submit\" value=\"Save\">";
-    html += "</form>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  } else {
-    // โค้ดของคุณสำหรับหน้าหลัก (การควบคุมแขนกล)
-    handleSetup();
-  }
+
+  // แสดงหน้าเว็บสำหรับการตั้งค่า Wi-Fi
+  html = "<html><body>";
+  html += "<h1>WiFi and Network Setup</h1>";
+  html += "<form action=\"/save-setup\" method=\"POST\">";
+  html += "SSID: <input type=\"text\" name=\"ssid\"><br>";
+  html += "Password: <input type=\"password\" name=\"password\"><br>";
+  html += "Static IP Address: <input type=\"text\" name=\"ip\" value=\"" + readStringFromEEPROM(64) + "\"><br>";
+  html += "Gateway: <input type=\"text\" name=\"gateway\" value=\"" + readStringFromEEPROM(96) + "\"><br>";
+  html += "Subnet Mask: <input type=\"text\" name=\"subnet\" value=\"" + readStringFromEEPROM(128) + "\"><br>";
+  html += "<input type=\"submit\" value=\"Save\">";
+  html += "</form>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
 }
 
 void executeCommand(Command cmd) {
@@ -309,7 +307,7 @@ void handleSaveWiFi() {
 }
 // ฟังก์ชันสำหรับแสดงหน้าเว็บพร้อมค่าสุดท้ายที่ผู้ใช้ส่ง
 void handleRoot() {
- 
+
   // html = "<html><head>";
   // html += "<style>";
   // html += "body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }";
@@ -330,7 +328,7 @@ void handleRoot() {
   // html += "<button onclick=\"location.href='/'\">Home</button>";
   // html += "<button onclick=\"location.href='/setup'\">Setup</button>";
   // html += "<button><a href=\"https://www.terkrobotics.com.z225694-4o13ru.ps03.zwhhosting.com/blockly?ip=" + ip + "\">Blockly</a>";
-  
+
   // // เนื้อหาฟอร์มควบคุมแขนกล
   // html += "<form action=\"/move\" method=\"GET\">";
   // html += "Joint 1 Angle: <input type=\"number\" name=\"theta1\" value=\"" + String(lastTheta1) + "\"><br>";
@@ -343,40 +341,90 @@ void handleRoot() {
   // html += "</form>";
 
   // html += "</div></body></html>";
-    html = "<!DOCTYPE html><html lang=\"en\"><head>";
-    html += "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
-    html += "<title>3DOF Robotic Arm Joystick Control</title><style>";
-    html += "body { background-color: #f0f8ff; font-family: Arial, sans-serif; text-align: center; padding: 20px; }";
-    html += ".joystick { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 5px; justify-content: center; align-items: center; margin: 20px auto; }";
-    html += ".joystick button { width: 80px; height: 80px; font-size: 16px; border: none; background-color: #4CAF50; color: white; border-radius: 10px; transition: background-color 0.3s, transform 0.1s; }";
-    html += ".joystick button:hover { background-color: #45a049; }";
-    html += ".joystick button:active { background-color: #367636; transform: scale(0.95); }";
-    html += ".controls { margin-top: 20px; }";
-    html += ".controls button { margin: 5px; padding: 10px 20px; font-size: 16px; border: none; background-color: #008CBA; color: white; border-radius: 5px; transition: background-color 0.3s, transform 0.1s; }";
-    html += ".controls button:hover { background-color: #007bb5; }";
-    html += ".controls button:active { background-color: #005f87; transform: scale(0.95); }";
-    html += "input[type=\"number\"] { padding: 5px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-right: 10px; }";
-    html += "h1, h2 { color: #333; }";
-    html += "@media (max-width: 600px) { .joystick { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); }";
-    html += ".joystick button { width: 60px; height: 60px; font-size: 14px; } .controls button { padding: 8px 15px; font-size: 14px; } input[type=\"number\"] { font-size: 14px; } }";
-    html += ".message { margin-top: 20px; color: #333; font-size: 18px; }</style>";
-    html += "<script>function sendCommand(command) {";
-    html += "const messageBox = document.getElementById('message'); messageBox.textContent = 'Sending command: ' + command + '...';";
-    html += "fetch(`/${command}`)";
-    html += ".then(response => { if (response.ok) { messageBox.textContent = 'Command sent successfully!'; } else { messageBox.textContent = 'Failed to send command!'; } })";
-    html += ".catch(error => { messageBox.textContent = 'Error sending command: ' + error; }); }";
-    html += "function adjustGripper() { const angle = document.getElementById('gripperAngle').value; sendCommand('set_gripper_angle?angle=' + angle); }</script></head><body>";
-    html += "<h1>3DOF Robotic Arm Joystick Control</h1><div class=\"joystick\">";
-    html += "<button onclick=\"sendCommand('up')\">↑</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('down')\">↓</button>";
-    html += "<button onclick=\"sendCommand('left')\">←</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('right')\">→</button></div>";
-    html += "<div class=\"controls\"><h2>Gripper Control</h2><button onclick=\"sendCommand('open_gripper')\">Open Gripper</button>";
-    html += "<button onclick=\"sendCommand('close_gripper')\">Close Gripper</button><br><br>";
-    html += "<label for=\"gripperAngle\">Set Gripper Angle:</label>";
-    html += "<input type=\"number\" id=\"gripperAngle\" min=\"0\" max=\"180\" value=\"90\">";
-    html += "<button onclick=\"adjustGripper()\">Set Angle</button></div><div id=\"message\" class=\"message\"></div></body></html>";
+  html = "<!DOCTYPE html><html lang=\"en\"><head>";
+  html += "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
+  html += "<title>3DOF Robotic Arm Joystick Control</title><style>";
+  html += "body { background-color: #f0f8ff; font-family: Arial, sans-serif; text-align: center; padding: 20px; }";
+  html += ".joystick { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 5px; justify-content: center; align-items: center; margin: 20px auto; }";
+  html += ".joystick button { width: 80px; height: 80px; font-size: 16px; border: none; background-color: #4CAF50; color: white; border-radius: 10px; transition: background-color 0.3s, transform 0.1s; }";
+  html += ".joystick button:hover { background-color: #45a049; }";
+  html += ".joystick button:active { background-color: #367636; transform: scale(0.95); }";
+  html += ".controls { margin-top: 20px; }";
+  html += ".controls button { margin: 5px; padding: 10px 20px; font-size: 16px; border: none; background-color: #008CBA; color: white; border-radius: 5px; transition: background-color 0.3s, transform 0.1s; }";
+  html += ".controls button:hover { background-color: #007bb5; }";
+  html += ".controls button:active { background-color: #005f87; transform: scale(0.95); }";
+  html += "input[type=\"number\"] { padding: 5px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-right: 10px; }";
+  html += "h1, h2 { color: #333; }";
+  html += "@media (max-width: 600px) { .joystick { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); }";
+  html += ".joystick button { width: 60px; height: 60px; font-size: 14px; } .controls button { padding: 8px 15px; font-size: 14px; } input[type=\"number\"] { font-size: 14px; } }";
+  html += ".message { margin-top: 20px; color: #333; font-size: 18px; }</style>";
+  html += "<script>function sendCommand(command) {";
+  html += "const messageBox = document.getElementById('message'); messageBox.textContent = 'Sending command: ' + command + '...';";
+  html += "fetch(`/${command}`)";
+  html += ".then(response => { if (response.ok) { messageBox.textContent = 'Command sent successfully!'; } else { messageBox.textContent = 'Failed to send command!'; } })";
+  html += ".catch(error => { messageBox.textContent = 'Error sending command: ' + error; }); }";
+  html += "function adjustGripper() { const angle = document.getElementById('gripperAngle').value; sendCommand('set_gripper_angle?angle=' + angle); }</script></head><body>";
+  html += "<h1>3DOF Robotic Arm Joystick Control</h1><div class=\"joystick\">";
+  html += "<button onclick=\"sendCommand('up')\">↑</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('down')\">↓</button>";
+  html += "<button onclick=\"sendCommand('left')\">←</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('right')\">→</button></div>";
+  html += "<div class=\"controls\"><h2>Gripper Control</h2><button onclick=\"sendCommand('open_gripper')\">Open Gripper</button>";
+  html += "<button onclick=\"sendCommand('close_gripper')\">Close Gripper</button><br><br>";
+  html += "<label for=\"gripperAngle\">Set Gripper Angle:</label>";
+  html += "<input type=\"number\" id=\"gripperAngle\" min=\"0\" max=\"180\" value=\"90\">";
+  html += "<button onclick=\"adjustGripper()\">Set Angle</button></div><div id=\"message\" class=\"message\"></div></body></html>";
   server.send(200, "text/html", html);
 }
 
+void handleMain() {
+  html = "<!DOCTYPE html>";
+  html += "<html lang=\"en\">";
+  html += "<head>";
+  html += "<meta charset=\"UTF-8\">";
+  html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
+  html += "<title>Robot Arm Learning Platform</title>";
+  html += "<style>";
+  html += "body {";
+  html += "font-family: Arial, sans-serif;";
+  html += " text-align: center;";
+  html += "background-color: #f0f0f0;";
+  html += "}";
+  html += ".container {";
+  html += "margin: 20px auto;";
+  html += "padding: 20px;";
+  html += "background-color: #fff;";
+  html += "box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);";
+  html += "max-width: 600px;";
+  html += "}";
+  html += " a {";
+  html += "text-decoration: none;";
+  html += "display: block;";
+  html += " margin: 10px;";
+  html += "padding: 10px;";
+  html += "background-color: #4CAF50;";
+  html += "color: white;";
+  html += "border-radius: 5px;";
+  html += "}";
+  html += " a:hover {";
+  html += "background-color: #45a049;";
+  html += " }";
+  html += "</style>";
+  html += "</head>";
+  html += "<body>";
+  html += " <div class=\"container \">";
+  html += " <h1>ยินดีต้อนรับสู่แพลตฟอร์มการเรียนรู้แขนหุ่นยนต์</h1>";
+  html += " <h3>Select a Lesson:</h3>";
+  html += " <a href=\"index\">การควบคุม x y z</a>";
+  html += " <a href=\"" + urlMain + "/blockly?ip=" + ip + "\">Blockly</a>";
+  html += " <a href=\"" + urlMain + "\">เนื้อหาการสร้างแขนกล</a>";
+  html += " <h3>Control the Robot Arm:</h3>";
+  html += " <a href=\"setup\">ตั้งค่า wifi</a>";
+  html += " <a href=\"setuparm\">ตั้งค่า แขนกล</a>";
+  html += " <a href=\"ota\">update firmware</a>";
+  html += " </div>";
+  html += "</body>";
+  html += "</html>";
+  server.send(200, "text/html", html);
+}
 // ฟังก์ชันการแสดงหน้าเว็บสำหรับตั้งค่า
 void handleSetupPage() {
   html = "<html><body>";
@@ -400,42 +448,42 @@ void handleSetupPage() {
 
 
 void handleOta() {
- html = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>";
- html += "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>";
- html += "<input type='file' name='update'>";
- html += "<input type='submit' value='Update'>";
- html += "</form>";
- html += "<div id='prg'>progress: 0%</div>";
- html += "<script>";
- html +=  "$('form').submit(function(e){";
- html +=  "e.preventDefault();";
- html +=  "var form = $('#upload_form')[0];";
- html +=  "var data = new FormData(form);";
- html +=  " $.ajax({";
- html +=  "url: '/update',";
- html +=  "type: 'POST',";
- html +=  "data: data,";
- html +=  "contentType: false,";
- html +=  "processData:false,";
- html +=  "xhr: function() {";
- html +=  "var xhr = new window.XMLHttpRequest();";
- html +=  "xhr.upload.addEventListener('progress', function(evt) {";
- html +=  "if (evt.lengthComputable) {";
- html +=  "var per = evt.loaded / evt.total;";
- html +=  "$('#prg').html('progress: ' + Math.round(per*100) + '%');";
- html +=  "}";
- html +=  "}, false);";
- html +=  "return xhr;";
- html +=  "},";
- html +=  "success:function(d, s) {";
- html +=  "console.log('success!')";
- html += "},";
- html += "error: function (a, b, c) {";
- html += "}";
- html += "});";
- html += "});";
- html += "</script>";
- server.send(200, "text/html", html);
+  html = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>";
+  html += "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>";
+  html += "<input type='file' name='update'>";
+  html += "<input type='submit' value='Update'>";
+  html += "</form>";
+  html += "<div id='prg'>progress: 0%</div>";
+  html += "<script>";
+  html += "$('form').submit(function(e){";
+  html += "e.preventDefault();";
+  html += "var form = $('#upload_form')[0];";
+  html += "var data = new FormData(form);";
+  html += " $.ajax({";
+  html += "url: '/update',";
+  html += "type: 'POST',";
+  html += "data: data,";
+  html += "contentType: false,";
+  html += "processData:false,";
+  html += "xhr: function() {";
+  html += "var xhr = new window.XMLHttpRequest();";
+  html += "xhr.upload.addEventListener('progress', function(evt) {";
+  html += "if (evt.lengthComputable) {";
+  html += "var per = evt.loaded / evt.total;";
+  html += "$('#prg').html('progress: ' + Math.round(per*100) + '%');";
+  html += "}";
+  html += "}, false);";
+  html += "return xhr;";
+  html += "},";
+  html += "success:function(d, s) {";
+  html += "console.log('success!')";
+  html += "},";
+  html += "error: function (a, b, c) {";
+  html += "}";
+  html += "});";
+  html += "});";
+  html += "</script>";
+  server.send(200, "text/html", html);
 }
 void handleSaveSetupArm() {
   // อ่านค่าจากฟอร์ม
@@ -489,6 +537,27 @@ void setHomePosition() {
   // ควบคุม Gripper
   gripperServo.write(lastGripper);
 }
+
+void setHomeArm() {
+  // คำนวณตำแหน่งปลายแขนกลด้วย Forward Kinematics
+  // calculateForwardKinematics(lastTheta1, lastTheta2, lastTheta3);
+
+  // ตั้งค่าความเร็วและความเร่งที่ได้รับจากเว็บ
+
+  setStepperSpeedAndAcceleration(3000, 500);
+  // แปลงมุมเป็นสเต็ปและเคลื่อนมอเตอร์
+  stepper1.moveTo(0);  // theta1AngleToSteps
+  stepper2.moveTo(0);  // theta2AngleToSteps
+  stepper3.moveTo(0);  // phiAngleToSteps
+
+  // เคลื่อนที่ทั้งหมด
+  while (stepper1.isRunning() || stepper2.isRunning() || stepper3.isRunning()) {
+
+    stepper1.run();
+    stepper2.run();
+    stepper3.run();
+  }
+}
 // ฟังก์ชันสำหรับรับคำสั่งการเคลื่อนที่จากเว็บเบราว์เซอร์
 void handleMove() {
   // รับค่าจากฟอร์ม
@@ -524,17 +593,64 @@ void handleMove() {
   server.send(303);                    // 303: See Other (Redirect to GET)
 }
 
+void handleOutput() {
+  // รับค่าจากฟอร์ม
+  targetTheta1_i = server.arg("io").toInt();
+  state = server.arg("state");
+  Serial.println("------Output-------");
+  Serial.println(targetTheta1_i);
+  Serial.println(state);
+
+  Command cmd;
+  cmd.type = "output";
+  cmd.theta1 = targetTheta1_i;
+  cmd.theta2 = 0;
+  cmd.theta3 = 0;
+  cmd.speed = 0;
+  cmd.acceleration = 0;
+  commandQueue.push(cmd);
+  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
+  server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
+  server.send(303);                    // 303: See Other (Redirect to GET)
+}
+void handleIf() {
+  // รับค่าจากฟอร์ม
+  targetTheta1_i = server.arg("io").toInt();
+  state = server.arg("state");
+  Serial.println("------if-------");
+  Serial.println(targetTheta1_i);
+  Serial.println(state);
+
+  Command cmd;
+  cmd.type = "if";
+  cmd.theta1 = targetTheta1_i;
+  cmd.theta2 = 0;
+  cmd.theta3 = 0;
+  cmd.speed = 0;
+  cmd.acceleration = 0;
+  commandQueue.push(cmd);
+  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
+  server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
+  server.send(303);                    // 303: See Other (Redirect to GET)
+}
 void handleGripper() {
   // รับค่าจากฟอร์ม
   lastGripper = server.arg("gripper").toInt();
 
+
+  Serial.println("------Gripper-------");
+
   Serial.println(lastGripper);
-
-  Serial.println("-------------");
-
   // ควบคุม Gripper
-  gripperServo.write(lastGripper);
-
+  //
+  Command cmd;
+  cmd.type = "Gripper";
+  cmd.theta1 = lastGripper;
+  cmd.theta2 = 0;
+  cmd.theta3 = 0;
+  cmd.speed = 0;
+  cmd.acceleration = 0;
+  commandQueue.push(cmd);
   // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
   server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
   server.send(303);                    // 303: See Other (Redirect to GET)
@@ -543,10 +659,18 @@ void handleDelay() {
   // รับค่าจากฟอร์ม
   delay_time = server.arg("time").toInt();
 
-  Serial.println(lastGripper);
+
 
   Serial.println("------delay_time-------");
-
+  Serial.println(delay_time);
+  Command cmd;
+  cmd.type = "delay";
+  cmd.theta1 = delay_time;
+  cmd.theta2 = 0;
+  cmd.theta3 = 0;
+  cmd.speed = 0;
+  cmd.acceleration = 0;
+  commandQueue.push(cmd);
   // ควบคุม Gripper
 
   // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
@@ -560,6 +684,13 @@ void handleFor() {
   targetTheta1_i = server.arg("BY").toInt();
   targetTheta2_i = server.arg("FROM").toInt();
   targetTheta3_i = server.arg("TO").toInt();
+
+  Serial.println("------for-------");
+  Serial.println(targetTheta1_i);
+  Serial.println(targetTheta2_i);
+  Serial.println(targetTheta3_i);
+
+
   Command cmd;
   cmd.type = "for";
   cmd.theta1 = targetTheta1_i;
@@ -573,25 +704,32 @@ void handleFor() {
   server.send(303);                    // 303: See Other (Redirect to GET)
 }
 void handleHome() {
-  // รับค่าจากฟอร์ม
-  setHomePosition();
+  Serial.println("------home-------");
 
-  Serial.println("------Home-------");
+  Command cmd;
+  cmd.type = "home";
+  cmd.theta1 = 0;
+  cmd.theta2 = 0;
+  cmd.theta3 = 0;
+  cmd.speed = 0;
+  cmd.acceleration = 0;
+  commandQueue.push(cmd);
 
-  // ควบคุม Gripper
-
-  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
   server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
   server.send(303);                    // 303: See Other (Redirect to GET)
 }
 void handleZero() {
-  // รับค่าจากฟอร์ม
-  setZero();
-  Serial.println("------Home-------");
+  Serial.println("------zero-------");
 
-  // ควบคุม Gripper
+  Command cmd;
+  cmd.type = "zero";
+  cmd.theta1 = 0;
+  cmd.theta2 = 0;
+  cmd.theta3 = 0;
+  cmd.speed = 0;
+  cmd.acceleration = 0;
+  commandQueue.push(cmd);
 
-  // ทำการ Redirect กลับไปที่หน้าแรก (ฟอร์มควบคุม)
   server.sendHeader("Location", "/");  // กลับไปที่ URL "/"
   server.send(303);                    // 303: See Other (Redirect to GET)
 }
@@ -659,11 +797,11 @@ void setup() {
   ip = readStringFromEEPROM(64);
   gateway = readStringFromEEPROM(96);
   subnet = readStringFromEEPROM(128);
-  
+
   Serial.println(savedSSID);
   Serial.println(savedPassword);
 
-  if (savedSSID.length() < 2 ) {
+  if (savedSSID.length() < 2) {
     Serial.println("Starting in AP mode...");
     isFirstTime = true;
     WiFi.softAP("RobotArmAP", "12345678");
@@ -689,6 +827,12 @@ void setup() {
     while (WiFi.status() != WL_CONNECTED) {
       delay(1000);
       Serial.print(".");
+      wifi_connecy_count++;
+      if (wifi_connecy_count > 20) {
+        writeStringToEEPROM(0, "0");
+        writeStringToEEPROM(32, "0");
+        ESP.restart();
+      }
     }
 
     Serial.println("");
@@ -702,14 +846,15 @@ void setup() {
   gripperServo.write(180);
   setStepperSpeedAndAcceleration(lastSpeed, lastAcceleration);
 
-  // setZero();
-  // setHomePosition();
-
+ // setZero();
+ // setHomePosition();
+  server.enableCORS();
   // เริ่มต้น Web Server
-  server.on("/", handleRoot);      // หน้าเว็บหลัก
-  server.on("/move", handleMove);  // รับคำสั่งการเคลื่อนที่
+  server.on("/", handleMain);       // หน้าเว็บหลัก
+  server.on("/index", handleRoot);  // หน้าเว็บหลัก
+  server.on("/move", handleMove);   // รับคำสั่งการเคลื่อนที่
 
-  server.on("/setupwifi", handleSetup);     // หน้าเว็บหลัก
+  server.on("/setup", handleSetup);         // หน้าเว็บหลัก
   server.on("/setuparm", handleSetupPage);  // หน้าเว็บหลัก
   server.on("/save-setup", handleSaveWiFi);
   server.on("/save-param", handleSaveSetupArm);
@@ -718,33 +863,36 @@ void setup() {
   server.on("/for", handleFor);
   server.on("/home", handleHome);
   server.on("/zero", handleZero);
-  server.on("/ota", handleOta);
-
+  server.on("/ota", handleOta);  //
+  server.on("/output", handleOutput);
+  server.on("/if", handleIf);
   /*handling uploading firmware file */
-  server.on("/update", HTTP_POST, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-    ESP.restart();
-  }, []() {
-    HTTPUpload& upload = server.upload();
-    if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("Update: %s\n", upload.filename.c_str());
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-        Update.printError(Serial);
+  server.on(
+    "/update", HTTP_POST, []() {
+      server.sendHeader("Connection", "close");
+      server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+      ESP.restart();
+    },
+    []() {
+      HTTPUpload &upload = server.upload();
+      if (upload.status == UPLOAD_FILE_START) {
+        Serial.printf("Update: %s\n", upload.filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  //start with max available size
+          Update.printError(Serial);
+        }
+      } else if (upload.status == UPLOAD_FILE_WRITE) {
+        /* flashing firmware to ESP*/
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+          Update.printError(Serial);
+        }
+      } else if (upload.status == UPLOAD_FILE_END) {
+        if (Update.end(true)) {  //true to set the size to the current progress
+          Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+        } else {
+          Update.printError(Serial);
+        }
       }
-    } else if (upload.status == UPLOAD_FILE_WRITE) {
-      /* flashing firmware to ESP*/
-      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-        Update.printError(Serial);
-      }
-    } else if (upload.status == UPLOAD_FILE_END) {
-      if (Update.end(true)) { //true to set the size to the current progress
-        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-      } else {
-        Update.printError(Serial);
-      }
-    }
-  });
+    });
   server.begin();
   Serial.println("Web server started");
   // ตั้งค่า Timer ให้เรียกใช้ `onTimer` ทุกๆ 1 ms
@@ -755,13 +903,46 @@ void setup() {
 }
 
 void loop() {
-
+  serial();
   if (!commandQueue.empty()) {
     Command cmd = commandQueue.front();
-    executeCommand(cmd);
+    if (!commandQueue.empty()) {
+
+      if (cmd.type == "move") {
+        executeCommand(cmd);
+      } else if (cmd.type == "delay") {
+        delay(cmd.theta1);
+      } else if (cmd.type == "Gripper") {
+        gripperServo.write(cmd.theta1);
+      } else if (cmd.type == "home") {
+        setHomeArm();
+      } else if (cmd.type == "zero") {
+        setZero();
+      } else if (cmd.type == "output") {
+
+      } else {
+        // Handle other cases if needed
+      }
+    }
     commandQueue.pop();
   }
 
+
+
   // จัดการคำร้องขอ HTTP
   server.handleClient();
+}
+
+void serial() {
+  if (Serial.available()) {
+    content = Serial.readString();  // อ่านข้อมูลจาก Processing
+
+    Serial.println(content);
+    // แยกข้อมูลจากสตริงและใส่ในตัวแปรอาร์เรย์ data[]
+    for (int i = 0; i < 10; i++) {
+      int index = content.indexOf(",");                     // ค้นหาเครื่องหมาย ","
+      data[i] = atol(content.substring(0, index).c_str());  // แยกตัวเลขจากข้อมูล
+      content = content.substring(index + 1);               // ลบตัวเลขออกจากสตริง
+    }
+  }
 }
