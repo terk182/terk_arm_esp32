@@ -307,7 +307,59 @@ void handleSaveWiFi() {
 }
 // ฟังก์ชันสำหรับแสดงหน้าเว็บพร้อมค่าสุดท้ายที่ผู้ใช้ส่ง
 void handleRoot() {
+  html = "<html><body>";
+  html += "<h1>Robot Arm Control</h1>";
+  html += "<form action=\"/move\" method=\"GET\">";
+  html += "Joint 1 Angle: <input type=\"number\" name=\"theta1\" value=\"" + String(lastTheta1) + "\"><br>";
+  html += "Joint 2 Angle: <input type=\"number\" name=\"theta2\" value=\"" + String(lastTheta2) + "\"><br>";
+  html += "Joint 3 Angle: <input type=\"number\" name=\"theta3\" value=\"" + String(lastTheta3) + "\"><br>";
+  html += "Gripper: <input type=\"number\" name=\"gripper\" value=\"" + String(lastGripper) + "\"><br>";
+  html += "Speed: <input type=\"number\" name=\"speed\" value=\"" + String(lastSpeed) + "\"><br>";
+  html += "Acceleration: <input type=\"number\" name=\"acceleration\" value=\"" + String(lastAcceleration) + "\"><br>";
+  html += "<input type=\"submit\" value=\"Move\">";
+  html += "</form>";
 
+  // แสดงผลตำแหน่งปลายแขนกล
+  html += "<h2>End Effector Position</h2>";
+  html += "X: " + String(endEffectorX) + " mm<br>";
+  html += "Y: " + String(endEffectorY) + " mm<br>";
+  html += "Z: " + String(endEffectorZ) + " mm<br>";  // แสดงแกน Z
+
+  // กำหนดพื้นที่สำหรับพล็อตกราฟ
+  html += "<canvas id=\"myChart\" width=\"400\" height=\"400\" style=\"border:1px solid #000000;\"></canvas>";
+
+  // เพิ่ม JavaScript สำหรับการวาดกราฟ
+  html += "<script>";
+  html += "function drawChart() {";
+  html += "  var canvas = document.getElementById('myChart');";
+  html += "  var ctx = canvas.getContext('2d');";
+  html += "  ctx.clearRect(0, 0, canvas.width, canvas.height);";  // ล้างกราฟเก่า
+
+  // คำนวณตำแหน่ง X, Y, Z โดยการสเกลให้เหมาะสมกับ canvas
+  html += "  var scale = 2;";
+  html += "  var x = " + String(endEffectorX) + " * scale + 200;";
+  html += "  var y = " + String(endEffectorY) + " * scale + 200;";
+  html += "  var z = " + String(endEffectorZ) + " * scale;";
+
+  // วาดจุดปลายแขนกล
+  html += "  ctx.beginPath();";
+  html += "  ctx.arc(x, y, 5, 0, 2 * Math.PI);";  // วาดวงกลมที่ตำแหน่ง X, Y
+  html += "  ctx.fillStyle = 'red';";
+  html += "  ctx.fill();";
+
+  // วาดข้อความแสดงค่า X, Y, Z ใกล้จุดที่วาด
+  html += "  ctx.font = '12px Arial';";
+  html += "  ctx.fillText('X: ' + Math.round(" + String(endEffectorX) + ") + ' mm', x + 10, y);";
+  html += "  ctx.fillText('Y: ' + Math.round(" + String(endEffectorY) + ") + ' mm', x + 10, y + 15);";
+  html += "  ctx.fillText('Z: ' + Math.round(" + String(endEffectorZ) + ") + ' mm', x + 10, y + 30);";
+
+  html += "}";
+  html += "drawChart();";  // เรียกฟังก์ชันวาดกราฟเมื่อโหลดหน้าเว็บ
+  html += "</script>";
+
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
   // html = "<html><head>";
   // html += "<style>";
   // html += "body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }";
@@ -341,38 +393,38 @@ void handleRoot() {
   // html += "</form>";
 
   // html += "</div></body></html>";
-  html = "<!DOCTYPE html><html lang=\"en\"><head>";
-  html += "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
-  html += "<title>3DOF Robotic Arm Joystick Control</title><style>";
-  html += "body { background-color: #f0f8ff; font-family: Arial, sans-serif; text-align: center; padding: 20px; }";
-  html += ".joystick { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 5px; justify-content: center; align-items: center; margin: 20px auto; }";
-  html += ".joystick button { width: 80px; height: 80px; font-size: 16px; border: none; background-color: #4CAF50; color: white; border-radius: 10px; transition: background-color 0.3s, transform 0.1s; }";
-  html += ".joystick button:hover { background-color: #45a049; }";
-  html += ".joystick button:active { background-color: #367636; transform: scale(0.95); }";
-  html += ".controls { margin-top: 20px; }";
-  html += ".controls button { margin: 5px; padding: 10px 20px; font-size: 16px; border: none; background-color: #008CBA; color: white; border-radius: 5px; transition: background-color 0.3s, transform 0.1s; }";
-  html += ".controls button:hover { background-color: #007bb5; }";
-  html += ".controls button:active { background-color: #005f87; transform: scale(0.95); }";
-  html += "input[type=\"number\"] { padding: 5px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-right: 10px; }";
-  html += "h1, h2 { color: #333; }";
-  html += "@media (max-width: 600px) { .joystick { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); }";
-  html += ".joystick button { width: 60px; height: 60px; font-size: 14px; } .controls button { padding: 8px 15px; font-size: 14px; } input[type=\"number\"] { font-size: 14px; } }";
-  html += ".message { margin-top: 20px; color: #333; font-size: 18px; }</style>";
-  html += "<script>function sendCommand(command) {";
-  html += "const messageBox = document.getElementById('message'); messageBox.textContent = 'Sending command: ' + command + '...';";
-  html += "fetch(`/${command}`)";
-  html += ".then(response => { if (response.ok) { messageBox.textContent = 'Command sent successfully!'; } else { messageBox.textContent = 'Failed to send command!'; } })";
-  html += ".catch(error => { messageBox.textContent = 'Error sending command: ' + error; }); }";
-  html += "function adjustGripper() { const angle = document.getElementById('gripperAngle').value; sendCommand('set_gripper_angle?angle=' + angle); }</script></head><body>";
-  html += "<h1>3DOF Robotic Arm Joystick Control</h1><div class=\"joystick\">";
-  html += "<button onclick=\"sendCommand('up')\">↑</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('down')\">↓</button>";
-  html += "<button onclick=\"sendCommand('left')\">←</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('right')\">→</button></div>";
-  html += "<div class=\"controls\"><h2>Gripper Control</h2><button onclick=\"sendCommand('open_gripper')\">Open Gripper</button>";
-  html += "<button onclick=\"sendCommand('close_gripper')\">Close Gripper</button><br><br>";
-  html += "<label for=\"gripperAngle\">Set Gripper Angle:</label>";
-  html += "<input type=\"number\" id=\"gripperAngle\" min=\"0\" max=\"180\" value=\"90\">";
-  html += "<button onclick=\"adjustGripper()\">Set Angle</button></div><div id=\"message\" class=\"message\"></div></body></html>";
-  server.send(200, "text/html", html);
+  // html = "<!DOCTYPE html><html lang=\"en\"><head>";
+  // html += "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
+  // html += "<title>3DOF Robotic Arm Joystick Control</title><style>";
+  // html += "body { background-color: #f0f8ff; font-family: Arial, sans-serif; text-align: center; padding: 20px; }";
+  // html += ".joystick { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 5px; justify-content: center; align-items: center; margin: 20px auto; }";
+  // html += ".joystick button { width: 80px; height: 80px; font-size: 16px; border: none; background-color: #4CAF50; color: white; border-radius: 10px; transition: background-color 0.3s, transform 0.1s; }";
+  // html += ".joystick button:hover { background-color: #45a049; }";
+  // html += ".joystick button:active { background-color: #367636; transform: scale(0.95); }";
+  // html += ".controls { margin-top: 20px; }";
+  // html += ".controls button { margin: 5px; padding: 10px 20px; font-size: 16px; border: none; background-color: #008CBA; color: white; border-radius: 5px; transition: background-color 0.3s, transform 0.1s; }";
+  // html += ".controls button:hover { background-color: #007bb5; }";
+  // html += ".controls button:active { background-color: #005f87; transform: scale(0.95); }";
+  // html += "input[type=\"number\"] { padding: 5px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-right: 10px; }";
+  // html += "h1, h2 { color: #333; }";
+  // html += "@media (max-width: 600px) { .joystick { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); }";
+  // html += ".joystick button { width: 60px; height: 60px; font-size: 14px; } .controls button { padding: 8px 15px; font-size: 14px; } input[type=\"number\"] { font-size: 14px; } }";
+  // html += ".message { margin-top: 20px; color: #333; font-size: 18px; }</style>";
+  // html += "<script>function sendCommand(command) {";
+  // html += "const messageBox = document.getElementById('message'); messageBox.textContent = 'Sending command: ' + command + '...';";
+  // html += "fetch(`/${command}`)";
+  // html += ".then(response => { if (response.ok) { messageBox.textContent = 'Command sent successfully!'; } else { messageBox.textContent = 'Failed to send command!'; } })";
+  // html += ".catch(error => { messageBox.textContent = 'Error sending command: ' + error; }); }";
+  // html += "function adjustGripper() { const angle = document.getElementById('gripperAngle').value; sendCommand('set_gripper_angle?angle=' + angle); }</script></head><body>";
+  // html += "<h1>3DOF Robotic Arm Joystick Control</h1><div class=\"joystick\">";
+  // html += "<button onclick=\"sendCommand('up')\">↑</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('down')\">↓</button>";
+  // html += "<button onclick=\"sendCommand('left')\">←</button><button onclick=\"sendCommand('stop')\">Stop</button><button onclick=\"sendCommand('right')\">→</button></div>";
+  // html += "<div class=\"controls\"><h2>Gripper Control</h2><button onclick=\"sendCommand('open_gripper')\">Open Gripper</button>";
+  // html += "<button onclick=\"sendCommand('close_gripper')\">Close Gripper</button><br><br>";
+  // html += "<label for=\"gripperAngle\">Set Gripper Angle:</label>";
+  // html += "<input type=\"number\" id=\"gripperAngle\" min=\"0\" max=\"180\" value=\"90\">";
+  // html += "<button onclick=\"adjustGripper()\">Set Angle</button></div><div id=\"message\" class=\"message\"></div></body></html>";
+  // server.send(200, "text/html", html);
 }
 
 void handleMain() {
@@ -846,8 +898,8 @@ void setup() {
   gripperServo.write(180);
   setStepperSpeedAndAcceleration(lastSpeed, lastAcceleration);
 
- // setZero();
- // setHomePosition();
+  setZero();
+  setHomePosition();
   server.enableCORS();
   // เริ่มต้น Web Server
   server.on("/", handleMain);       // หน้าเว็บหลัก
